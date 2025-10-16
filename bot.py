@@ -8,11 +8,60 @@ from utils.logger import logger
 
 load_dotenv()
 
-# Support both TELEGRAM_TOKEN and BOT_TOKEN environment variable names.
-API_TOKEN = os.getenv("TELEGRAM_TOKEN") or os.getenv("BOT_TOKEN")
+def _read_token_from_file(path: str):
+    try:
+        with open(path, 'r', encoding='utf-8') as fh:
+            return fh.read().strip()
+    except Exception:
+        return None
+
+
+def get_api_token():
+    # 1) env vars
+    token = os.getenv("TELEGRAM_TOKEN") or os.getenv("BOT_TOKEN")
+    if token:
+        return token.strip()
+
+    # 2) token file path provided in env
+    token_file = os.getenv('TOKEN_FILE')
+    if token_file:
+        t = _read_token_from_file(token_file)
+        if t:
+            return t
+
+    # 3) common Docker secret locations
+    for p in ('/run/secrets/TELEGRAM_TOKEN', '/run/secrets/telegram_token', '/var/run/secrets/telegram_token'):
+        t = _read_token_from_file(p)
+        if t:
+            return t
+
+    # 4) token.txt in repo root
+    t = _read_token_from_file('token.txt')
+    if t:
+        return t
+
+    # 5) last resort: try parse .env file manually if present
+    try:
+        import pathlib
+        env_path = pathlib.Path('.') / '.env'
+        if env_path.exists():
+            for line in env_path.read_text(encoding='utf-8').splitlines():
+                if line.strip().startswith('TELEGRAM_TOKEN') or line.strip().startswith('BOT_TOKEN'):
+                    parts = line.split('=', 1)
+                    if len(parts) == 2:
+                        return parts[1].strip().strip('"').strip("'")
+    except Exception:
+        pass
+
+    return None
+
+
+API_TOKEN = get_api_token()
 
 if not API_TOKEN:
-    raise RuntimeError("Telegram token not found. Set TELEGRAM_TOKEN (or BOT_TOKEN) in the environment or .env file")
+    logger.error("Telegram token not found. Set TELEGRAM_TOKEN (or BOT_TOKEN) as an environment variable in your hosting provider (Railway/Render) or provide a token file via TOKEN_FILE.")
+    logger.error("For local development you can place a .env file with TELEGRAM_TOKEN=... or create token.txt containing the token (not recommended for production).")
+    raise RuntimeError("Telegram token not found. TELEGRAM_TOKEN (or BOT_TOKEN) must be set in the environment or provided via TOKEN_FILE/token.txt")
 
 async def main():
     bot = Bot(token=API_TOKEN)
