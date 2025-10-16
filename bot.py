@@ -83,10 +83,13 @@ async def main():
 
     try:
         logger.info("Bot starting")
-        await dp.start_polling(bot)
+        await dp.start_polling(bot, allowed_updates=["message", "callback_query"])
     except Exception as e:
+        if "Conflict: terminated by other getUpdates request" in str(e):
+            logger.error("Bot already running elsewhere. Please stop other instances first.")
+            logger.error("If using Railway/Render, go to the dashboard and restart the service.")
+            return
         logger.exception("Unhandled exception in polling: %s", e)
-        raise
     finally:
         try:
             await bot.session.close()
