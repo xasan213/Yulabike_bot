@@ -22,9 +22,18 @@ async def admin_panel(message: Message):
 @router.message(lambda msg: msg.text and msg.text.startswith('/stats'))
 async def cmd_stats(message: Message):
     if not is_admin(message):
+        await message.answer("Bu buyruq faqat adminlar uchun.")
         return
-    st = await admin_stats()
-    await message.answer(f"Total users: {st['users']}\nPartners: {st['partners']}\nRenters: {st['renters']}")
+    try:
+        st = await admin_stats()
+        await message.answer(
+            "📊 Bot statistikasi:\n"
+            f"👥 Jami foydalanuvchilar: {st['users']}\n"
+            f"🤝 Hamkorlar: {st['partners']}\n"
+            f"🚲 Ijarachilar: {st['renters']}"
+        )
+    except Exception as e:
+        await message.answer("Statistikani olishda xatolik yuz berdi.")
 
 
 @router.message(lambda msg: msg.text and msg.text.startswith('/list_rentals'))

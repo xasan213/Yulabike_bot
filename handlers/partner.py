@@ -25,17 +25,24 @@ async def partner_steps(message: Message):
 
     step = state.get('step')
     if step == 'name':
-        # parse name
-        # Expect full name: Familya Ism Otasining_ismi (example: Abrorov Abror Abrorovich)
-        parts = (message.text or '').split(None, 1)
+        # Expect full name: Familya Ism Otasining_ismi
+        text = (message.text or '').strip()
+        parts = text.split()
+        if len(parts) < 2:
+            await message.answer('Iltimos, to\'liq ismingizni kiriting (masalan: Abrorov Abror Abrorovich)')
+            return
         state['first_name'] = parts[0]
-        state['last_name'] = parts[1] if len(parts) > 1 else ''
+        state['last_name'] = ' '.join(parts[1:])  # combine rest as last name
         state['step'] = 'phone'
-        await message.answer('Telefon raqamingizni yuboring (faqat raqam):')
+        await message.answer('Telefon raqamingizni yuboring (+998 formatida):')
         return
 
     if step == 'phone':
         phone = (message.text or '').strip()
+        # Basic validation for Uzbek numbers
+        if not (phone.startswith('+998') and len(phone.replace('+','').replace(' ','')) == 12 and phone.replace('+','').replace(' ','').isdigit()):
+            await message.answer('Iltimos, telefon raqamini +998 formatida kiriting')
+            return
         state['phone'] = phone
         state['step'] = 'city'
         await message.answer("Qaysi shahardan ekanligingiz? Iltimos shahar nomini yuboring (masalan: Tashkent yoki Namangan)")
@@ -62,10 +69,16 @@ async def partner_steps(message: Message):
         await message.answer('Velosiped rasmini yuboring:')
         return
 
-    if step == 'photo' and message.content_type == ContentType.PHOTO:
+    if step == 'photo':
+        if message.content_type != ContentType.PHOTO:
+            await message.answer('Iltimos, velosiped rasmini yuboring (fayl emas, rasm formatida)')
+            return
         # take highest resolution
         photo = message.photo[-1]
         file_id = photo.file_id
+        if not file_id:
+            await message.answer('Rasm yuklashda xatolik. Iltimos, qayta urinib ko\'ring')
+            return
 
         # create or update partner user (ensure DB user exists)
         user = await get_or_create_user(uid)

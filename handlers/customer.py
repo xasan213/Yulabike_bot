@@ -38,17 +38,25 @@ async def customer_steps(message: Message):
         return
     step = state.get('step')
     if step == 'name':
-        # Expect full name: Familya Ism Otasining_ismi (example: Abrorov Abror Abrorovich)
-        parts = (message.text or '').split(None, 1)
+        # Expect full name: Familya Ism Otasining_ismi
+        text = (message.text or '').strip()
+        parts = text.split()
+        if len(parts) < 2:
+            await message.answer('Iltimos, to\'liq ismingizni kiriting (masalan: Abrorov Abror Abrorovich)')
+            return
         state['first_name'] = parts[0]
-        state['last_name'] = parts[1] if len(parts) > 1 else ''
+        state['last_name'] = ' '.join(parts[1:])  # combine rest as last name
         state['step'] = 'phone'
-        await message.answer('Telefon raqamingizni yuboring (faqat raqam):')
+        await message.answer('Telefon raqamingizni yuboring (+998 formatida):')
         return
 
     if step == 'phone':
-        state['phone'] = (message.text or '').strip()
-        # ask for city (with example)
+        phone = (message.text or '').strip()
+        # Basic validation for Uzbek numbers
+        if not (phone.startswith('+998') and len(phone.replace('+','').replace(' ','')) == 12 and phone.replace('+','').replace(' ','').isdigit()):
+            await message.answer('Iltimos, telefon raqamini +998 formatida kiriting')
+            return
+        state['phone'] = phone
         state['step'] = 'city'
         await message.answer("Qaysi shahardan ekanligingiz? Iltimos shahar nomini yuboring (masalan: Tashkent yoki Namangan)")
         return
