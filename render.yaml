@@ -1,0 +1,13 @@
+# Render service manifest (example) - you can also configure via Render dashboard
+services:
+  - type: "background"
+    name: "velobike-bot"
+    env: "python"
+    plan: "free"
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python bot.py"
+    envVars:
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
