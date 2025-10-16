@@ -1,6 +1,8 @@
 from sqlalchemy import select, update
 from .db import get_session
 from .models import User, Bike, Rental, Payout
+from sqlalchemy import func
+import secrets
 
 
 async def get_or_create_user(telegram_id: int):
@@ -9,11 +11,53 @@ async def get_or_create_user(telegram_id: int):
         user = q.scalars().first()
         if user:
             return user
-        user = User(telegram_id=telegram_id)
+        # create a user with a referral code
+        code = secrets.token_urlsafe(6)
+        user = User(telegram_id=telegram_id, referral_code=code)
         session.add(user)
         await session.commit()
         await session.refresh(user)
         return user
+
+
+async def set_referrer(telegram_id: int, ref_code: str):
+    """Set referrer for a user if ref_code matches another user's referral_code."""
+    async with get_session() as session:
+        q = await session.execute(select(User).where(User.referral_code == ref_code))
+        ref = q.scalars().first()
+        if not ref:
+            return None
+        q2 = await session.execute(select(User).where(User.telegram_id == telegram_id))
+        user = q2.scalars().first()
+        if not user:
+            return None
+        user.referrer_id = ref.id
+        await session.commit()
+        await session.refresh(user)
+        return user
+
+
+async def count_referrals(referrer_telegram_id: int):
+    async with get_session() as session:
+        # find user id by telegram id
+        q = await session.execute(select(User).where(User.telegram_id == referrer_telegram_id))
+        ref = q.scalars().first()
+        if not ref:
+            return 0
+        q2 = await session.execute(select(func.count()).select_from(User).where(User.referrer_id == ref.id))
+        return q2.scalar_one()
+
+
+async def admin_stats():
+    async with get_session() as session:
+        total_users = await session.execute(select(func.count()).select_from(User))
+        total_users = total_users.scalar_one()
+        total_partners = await session.execute(select(func.count()).select_from(User).where(User.is_partner == True))
+        total_partners = total_partners.scalar_one()
+        # renters = users who have rentals
+        q = await session.execute(select(func.count(func.distinct(Rental.user_id))))
+        total_renters = q.scalar_one()
+        return {'users': total_users, 'partners': total_partners, 'renters': total_renters}
 
 
 async def list_available_bikes():

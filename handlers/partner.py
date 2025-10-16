@@ -1,5 +1,5 @@
 from aiogram import Router
-from aiogram.types import Message, ContentType
+from aiogram.types import Message, ContentType, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from aiogram.filters import Command
 from database.queries import register_partner, update_user_profile, create_bike_for_partner, get_or_create_user, partner_balance, list_partner_payouts
 from config import ADMIN_IDS
@@ -10,7 +10,7 @@ router = Router()
 _partner_state = {}
 
 
-@router.message(lambda msg: msg.text and 'Partner' in msg.text)
+@router.message(lambda msg: msg.text and 'hamkor' in msg.text.lower())
 async def become_partner(message: Message):
     _partner_state[message.from_user.id] = {'step': 'name'}
     await message.answer("Hamkor bo'lish uchun ismingizni va familiyangizni yuboring:")
@@ -26,6 +26,7 @@ async def partner_steps(message: Message):
     step = state.get('step')
     if step == 'name':
         # parse name
+        # Expect full name: Familya Ism Otasining_ismi (example: Abrorov Abror Abrorovich)
         parts = (message.text or '').split(None, 1)
         state['first_name'] = parts[0]
         state['last_name'] = parts[1] if len(parts) > 1 else ''
@@ -36,15 +37,23 @@ async def partner_steps(message: Message):
     if step == 'phone':
         phone = (message.text or '').strip()
         state['phone'] = phone
+        state['step'] = 'city'
+        await message.answer("Qaysi shahardan ekanligingiz? Iltimos shahar nomini yuboring (masalan: Tashkent yoki Namangan)")
+        return
+
+    if step == 'city':
+        state['city'] = (message.text or '').strip()
+        # ask for location via Telegram location button
+        kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Share location", request_location=True)]], resize_keyboard=True, one_time_keyboard=True)
         state['step'] = 'location'
-        await message.answer('Joylashuvingizni yuboring (lokatsiya tugmasi orqali):')
+        await message.answer('Iltimos, joylashuvingizni ulashing ("Share location" tugmasini bosing):', reply_markup=kb)
         return
 
     if step == 'location' and message.location:
         state['lat'] = message.location.latitude
         state['lon'] = message.location.longitude
         state['step'] = 'passport'
-        await message.answer("Passport yoki shaxsiy ID raqamini yuboring:")
+        await message.answer("Passport yoki shaxsiy ID raqamini yuboring:", reply_markup=ReplyKeyboardRemove())
         return
 
     if step == 'passport':
@@ -75,6 +84,12 @@ async def partner_steps(message: Message):
 
         await message.answer('Rahmat, arizangiz qabul qilindi. Adminlar bilan bog\'lanamiz.')
         _partner_state.pop(uid, None)
+        # show current balance/earnings to partner
+        try:
+            bal = await partner_balance(uid)
+            await message.answer(f"Sizning jami daromadingiz: {bal['earned']}, to'langan: {bal['paid']}, balans: {bal['balance']}")
+        except Exception:
+            pass
         return
 
     # fallback

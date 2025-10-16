@@ -3,6 +3,7 @@ from aiogram.types import Message
 from config import ADMIN_IDS
 from database.queries import list_rentals, pick_available_bike, update_user_profile, partner_earnings
 from database.queries import pick_main_bike, get_rental_by_id, assign_bike_to_rental, set_main_bike, get_user_by_db_id, record_payout, partner_balance
+from database.queries import admin_stats
 
 router = Router()
 
@@ -15,7 +16,15 @@ def is_admin(msg: Message) -> bool:
 async def admin_panel(message: Message):
     if not is_admin(message):
         return
-    await message.answer('Admin panel: /list_rentals, /assign_bike <rental_id>, /partner_earnings <partner_id>')
+    await message.answer("Admin panel: /list_rentals, /assign_bike <rental_id>, /partner_earnings <partner_id>, /stats")
+
+
+@router.message(lambda msg: msg.text and msg.text.startswith('/stats'))
+async def cmd_stats(message: Message):
+    if not is_admin(message):
+        return
+    st = await admin_stats()
+    await message.answer(f"Total users: {st['users']}\nPartners: {st['partners']}\nRenters: {st['renters']}")
 
 
 @router.message(lambda msg: msg.text and msg.text.startswith('/list_rentals'))
