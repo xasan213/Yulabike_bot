@@ -8,10 +8,11 @@ from utils.logger import logger
 
 load_dotenv()
 
-API_TOKEN = os.getenv("TELEGRAM_TOKEN")
+# Support both TELEGRAM_TOKEN and BOT_TOKEN environment variable names.
+API_TOKEN = os.getenv("TELEGRAM_TOKEN") or os.getenv("BOT_TOKEN")
 
 if not API_TOKEN:
-    raise RuntimeError("TELEGRAM_TOKEN not set in .env")
+    raise RuntimeError("Telegram token not found. Set TELEGRAM_TOKEN (or BOT_TOKEN) in the environment or .env file")
 
 async def main():
     bot = Bot(token=API_TOKEN)
@@ -45,3 +46,4 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
+
